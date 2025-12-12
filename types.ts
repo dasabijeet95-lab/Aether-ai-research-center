@@ -29,7 +29,7 @@ export interface ChartDataPoint {
   fill?: string;
 }
 
-export type ViewMode = 'dashboard' | 'contribute' | 'share' | 'integration' | 'folder-good' | 'folder-bad' | 'folder-ai';
+export type ViewMode = 'dashboard' | 'contribute' | 'share' | 'integration' | 'folder-good' | 'folder-bad' | 'folder-ai' | 'chat' | 'dns';
 
 export type CoreAlignment = 'BENEVOLENT' | 'NEUTRAL' | 'DEVIANT';
 
@@ -40,4 +40,18 @@ export interface CoreState {
   statusMessage: string; // e.g. "Systems stable. Human optimism detected."
   monologue: string; // Deeper philosophical reflection
   lastUpdated: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
+}
+
+export interface BackupData {
+  version: string;
+  timestamp: number;
+  memories: Memory[];
+  coreState: CoreState;
 }

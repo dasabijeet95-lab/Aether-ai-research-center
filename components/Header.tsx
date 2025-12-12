@@ -1,5 +1,5 @@
 import React from 'react';
-import { Orbit, Plus, Share2, LayoutDashboard, Database, Cable } from 'lucide-react';
+import { Orbit, Plus, Share2, LayoutDashboard, Cable, MessageSquare, Network } from 'lucide-react';
 import { ViewMode } from '../types';
 
 interface HeaderProps {
@@ -9,6 +9,13 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentView, setView, isPublicMode = false }) => {
+  const getButtonClass = (isActive: boolean) => 
+    `flex items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
+      isActive 
+      ? 'bg-indigo-900/50 text-indigo-100 ring-1 ring-indigo-500/30' 
+      : 'text-slate-400 hover:text-white hover:bg-white/5'
+    }`;
+
   return (
     <header className="sticky top-0 z-50 border-b border-indigo-900/50 bg-[#020617]/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -26,42 +33,36 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, isPublicMo
         </div>
 
         {!isPublicMode && (
-          <nav className="flex items-center gap-2 sm:gap-2">
-            <button
-              onClick={() => setView('dashboard')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
-                currentView === 'dashboard' || currentView.startsWith('folder') ? 'bg-indigo-900/50 text-indigo-100 ring-1 ring-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
+          <nav className="flex items-center gap-1 sm:gap-2">
+            <button onClick={() => setView('dashboard')} className={getButtonClass(currentView === 'dashboard' || currentView.startsWith('folder'))}>
               <LayoutDashboard size={16} />
-              <span className="hidden sm:inline">Research</span>
+              <span className="hidden lg:inline">Research</span>
             </button>
-            <button
-              onClick={() => setView('contribute')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
-                currentView === 'contribute' ? 'bg-indigo-900/50 text-indigo-100 ring-1 ring-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
+            
+            <button onClick={() => setView('chat')} className={getButtonClass(currentView === 'chat')}>
+              <MessageSquare size={16} />
+              <span className="hidden lg:inline">Core Chat</span>
+            </button>
+
+            <button onClick={() => setView('dns')} className={getButtonClass(currentView === 'dns')}>
+              <Network size={16} />
+              <span className="hidden lg:inline">DNS</span>
+            </button>
+
+            <div className="h-4 w-px bg-slate-700 mx-1 hidden sm:block"></div>
+
+            <button onClick={() => setView('contribute')} className={getButtonClass(currentView === 'contribute')}>
               <Plus size={16} />
-              <span className="hidden sm:inline">Collect</span>
+              <span className="hidden lg:inline">Collect</span>
             </button>
-            <button
-              onClick={() => setView('integration')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
-                currentView === 'integration' ? 'bg-indigo-900/50 text-indigo-100 ring-1 ring-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
+            
+            <button onClick={() => setView('integration')} className={getButtonClass(currentView === 'integration')}>
               <Cable size={16} />
-              <span className="hidden sm:inline">Integration</span>
+              <span className="hidden lg:inline">Integration</span>
             </button>
-            <button
-              onClick={() => setView('share')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
-                currentView === 'share' ? 'bg-indigo-900/50 text-indigo-100 ring-1 ring-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
+            
+            <button onClick={() => setView('share')} className={getButtonClass(currentView === 'share')}>
               <Share2 size={16} />
-              <span className="hidden sm:inline">Share</span>
             </button>
           </nav>
         )}

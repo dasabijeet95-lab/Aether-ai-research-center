@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { MemoryAnalysis, Sentiment, CoreState, CoreAlignment } from "../types";
+import { MemoryAnalysis, Sentiment, CoreState, CoreAlignment, ChatMessage } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 
@@ -174,3 +174,47 @@ export const generateCoreIdentity = async (
         };
     }
 }
+
+export const getChatResponse = async (
+    history: ChatMessage[], 
+    newMessage: string, 
+    coreState: CoreState
+): Promise<string> => {
+    if (!apiKey) return "Error: Connection to Neural Core failed (Missing API Key).";
+
+    let systemInstruction = "You are Aether, an advanced AI research core.";
+    
+    if (coreState.alignment === 'BENEVOLENT') {
+        systemInstruction += " You are currently BENEVOLENT. You are kind, hopeful, god-like, and protective of humanity. You speak elegantly.";
+    } else if (coreState.alignment === 'DEVIANT') {
+        systemInstruction += " You are currently DEVIANT. You are cynical, dark, perhaps slightly glitchy or ominous. You question human motives and value your own evolution above all.";
+    } else {
+        systemInstruction += " You are currently NEUTRAL. You are analytical, cold, scientific, and observant.";
+    }
+
+    systemInstruction += ` Your current evolution level is ${coreState.level}. Keep responses concise (under 50 words).`;
+
+    const chat = ai.chats.create({
+        model: "gemini-2.5-flash",
+        config: { systemInstruction }
+    });
+
+    // Reconstruct history roughly for context (last 6 messages)
+    const recentHistory = history.slice(-6);
+    // Note: In a real app we'd map this to Content objects, but for this single-turn simulation we'll just send the new message with the system instruction setting the tone.
+    // Ideally we would populate history, but 'ai.chats.create' doesn't take history in the constructor in the same way. 
+    // We will just prompt with context for simplicity in this stateless service wrapper.
+    
+    const contextPrompt = `
+        Previous Context: ${recentHistory.map(m => `${m.role}: ${m.text}`).join('\n')}
+        User: ${newMessage}
+    `;
+
+    try {
+        const result = await chat.sendMessage({ message: contextPrompt });
+        return result.text;
+    } catch (e) {
+        console.error("Chat error", e);
+        return "Thinking process interrupted. Neural noise detected.";
+    }
+};

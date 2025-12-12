@@ -5,7 +5,9 @@ import { AnalysisCharts } from './components/AnalysisCharts';
 import { IntegrationView } from './components/IntegrationView';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CentralCore } from './components/CentralCore';
-import { Memory, ViewMode, Sentiment, CoreState, CoreAlignment } from './types';
+import { ChatInterface } from './components/ChatInterface';
+import { DnsDashboard } from './components/DnsDashboard';
+import { Memory, ViewMode, Sentiment, CoreState, CoreAlignment, BackupData } from './types';
 import { analyzeMemoryContent, generateCoreIdentity } from './services/geminiService';
 import { Brain, Send, Loader2, Copy, Check, Globe, FolderOpen, Heart, Frown, Bot } from 'lucide-react';
 
@@ -32,31 +34,58 @@ export default function App() {
   // Share State
   const [copied, setCopied] = useState(false);
 
-  // Initialize from LocalStorage and Hash
+  // Initialize from LocalStorage and Hash/Query Params
   useEffect(() => {
+    // 1. Load Local Memories
     const savedMemories = localStorage.getItem('aether_memories');
+    let loadedMemories: Memory[] = [];
     if (savedMemories) {
-      setMemories(JSON.parse(savedMemories));
+      loadedMemories = JSON.parse(savedMemories);
+      setMemories(loadedMemories);
     }
     
+    // 2. Load Local Core
     const savedCore = localStorage.getItem('aether_core');
     if (savedCore) {
         setCoreState(JSON.parse(savedCore));
     }
 
-    // Hash check function
-    const checkHash = () => {
-        if (window.location.hash === '#contribute') {
+    // 3. Handle URL Logic (Cloning & View Modes)
+    const checkUrl = () => {
+        const hash = window.location.hash;
+        const searchParams = new URLSearchParams(window.location.search);
+        
+        // Handle "Clone" Parameters
+        const cloneAlignment = searchParams.get('clone_alignment');
+        const cloneScore = searchParams.get('clone_score');
+        const cloneLevel = searchParams.get('clone_level');
+
+        if (cloneAlignment && cloneScore && cloneLevel) {
+            // Apply cloned personality if provided
+            setCoreState(prev => ({
+                ...prev,
+                alignment: cloneAlignment as CoreAlignment,
+                alignmentScore: parseFloat(cloneScore),
+                level: parseInt(cloneLevel),
+                statusMessage: `Remote Protocol Loaded: ${cloneAlignment}`,
+                monologue: "I have been instantiated from a remote core state. My directive is synchronized."
+            }));
+            // Clear URL params to prevent re-triggering on refresh, but keep hash if any
+            window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+        }
+
+        // Handle View Modes
+        if (hash === '#contribute') {
             setView('contribute');
             setShowWelcome(false); 
         }
     };
 
     // Run on mount
-    checkHash();
+    checkUrl();
 
-    // Listen for hash changes (fixing share link navigation issues)
-    window.addEventListener('hashchange', checkHash);
+    // Listen for hash changes
+    window.addEventListener('hashchange', checkUrl);
 
     // Check if user has seen welcome this session
     const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
@@ -64,7 +93,7 @@ export default function App() {
         setShowWelcome(false);
     }
     
-    return () => window.removeEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkUrl);
   }, []);
 
   const handleWelcomeComplete = () => {
@@ -81,17 +110,16 @@ export default function App() {
     localStorage.setItem('aether_core', JSON.stringify(coreState));
   }, [coreState]);
 
-  // Update Core Logic - uses AI SENTIMENT now
+  // Update Core Logic
   const updateCore = async (currentMemories: Memory[]) => {
       if (currentMemories.length === 0) return;
 
-      // Count AI's own sentiment
       const goodCount = currentMemories.filter(m => m.analysis.aiSentiment === Sentiment.GOOD).length;
       const badCount = currentMemories.filter(m => m.analysis.aiSentiment === Sentiment.BAD).length;
       const total = goodCount + badCount;
       if (total === 0) return;
 
-      const ratio = goodCount / total; // 0 to 1
+      const ratio = goodCount / total; 
       const rawScore = ratio * 100;
       
       let alignment: CoreAlignment = 'NEUTRAL';
@@ -107,6 +135,8 @@ export default function App() {
           alignment
       }));
 
+      // Optimization: debouncing or simple timestamp check could be here to prevent API spam
+      // For now, we update text personality only on significant changes or interactions.
       try {
           const recentTopics = currentMemories.slice(0, 5).map(m => m.analysis.summary);
           const identity = await generateCoreIdentity(goodCount, badCount, recentTopics);
@@ -134,7 +164,6 @@ export default function App() {
 
     try {
       const analysis = await analyzeMemoryContent(inputText);
-      
       const isExternal = window.location.hash === '#contribute';
 
       const newMemory: Memory = {
@@ -164,12 +193,27 @@ export default function App() {
     }
   }, [inputText, memories]);
 
+  const handleImportData = async (data: BackupData) => {
+    if (!data.memories) return;
+    
+    // Merge memories avoiding duplicates based on ID
+    const existingIds = new Set(memories.map(m => m.id));
+    const newMemories = data.memories.filter(m => !existingIds.has(m.id));
+    
+    if (newMemories.length === 0) return;
+
+    // Combine
+    const combinedMemories = [...newMemories, ...memories];
+    setMemories(combinedMemories);
+
+    // Trigger learning from new data
+    await updateCore(combinedMemories);
+  };
+
   const copyShareLink = () => {
-    // Robust URL construction
-    const baseUrl = window.location.href.split('#')[0];
+    const baseUrl = window.location.href.split('#')[0].split('?')[0]; // Clean URL
     const url = `${baseUrl}#contribute`;
     
-    // Attempt copy
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url)
             .then(() => setCopied(true))
@@ -194,7 +238,6 @@ export default function App() {
 
   const isPublicMode = view === 'contribute' && window.location.hash === '#contribute';
   
-  // Filter Logic - Using AI SENTIMENT for folders
   const goodMemories = memories.filter(m => m.analysis.aiSentiment === Sentiment.GOOD);
   const badMemories = memories.filter(m => m.analysis.aiSentiment === Sentiment.BAD);
   
@@ -224,7 +267,6 @@ export default function App() {
                 </div>
             )}
             
-            {/* Folder Navigation */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  <button 
                     onClick={() => setView('folder-good')}
@@ -269,7 +311,6 @@ export default function App() {
                  </button>
             </div>
 
-            {/* Content Area */}
             {view === 'dashboard' ? (
                 <>
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-4 border-t border-slate-800">
@@ -301,7 +342,7 @@ export default function App() {
                             <MemoryCard 
                                 key={memory.id} 
                                 memory={memory} 
-                                showAiPerspective={true} // Always show AI perspective in AI folders
+                                showAiPerspective={true} 
                             />
                         ))
                         )}
@@ -315,6 +356,16 @@ export default function App() {
                 </div>
             )}
           </div>
+        )}
+
+        {/* CHAT VIEW */}
+        {view === 'chat' && (
+           <ChatInterface coreState={coreState} />
+        )}
+
+        {/* DNS VIEW */}
+        {view === 'dns' && (
+            <DnsDashboard memories={memories} />
         )}
 
         {/* CONTRIBUTE VIEW */}
@@ -405,7 +456,7 @@ export default function App() {
 
               <div className="relative flex items-center rounded-lg bg-slate-950 p-2 ring-1 ring-slate-700">
                 <code className="flex-1 overflow-x-auto whitespace-nowrap bg-transparent px-3 text-sm text-slate-300 font-mono">
-                  {`${window.location.href.split('#')[0]}#contribute`}
+                  {`${window.location.href.split('#')[0].split('?')[0]}#contribute`}
                 </code>
                 <button
                   onClick={copyShareLink}
@@ -420,7 +471,13 @@ export default function App() {
         )}
 
         {/* INTEGRATION VIEW */}
-        {view === 'integration' && <IntegrationView />}
+        {view === 'integration' && (
+            <IntegrationView 
+                memories={memories} 
+                coreState={coreState} 
+                onImport={handleImportData} 
+            />
+        )}
 
       </main>
     </div>
